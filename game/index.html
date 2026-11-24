@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SOLMAR HEAT — an original open-world crime game</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #0b1026; }
+  body { font-family: "Avenir Next", "Segoe UI", system-ui, sans-serif; color: #f2f4f6; }
+  #game-root, #game-root canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+
+  /* ---------- HUD ---------- */
+  #hud { position: fixed; inset: 0; pointer-events: none; z-index: 5; }
+  body[data-mode="title"] #hud { display: none; }
+  .panel { background: rgba(10, 15, 22, 0.62); border: 1px solid rgba(255, 210, 62, 0.35);
+           border-radius: 10px; backdrop-filter: blur(3px); }
+
+  #map-wrap { position: absolute; top: 14px; left: 14px; padding: 6px; }
+  #minimap { display: block; width: 218px; height: 218px; border-radius: 6px; }
+  #map-label { text-align: center; font-size: 10px; letter-spacing: 3px; color: #ffd23e; padding-top: 4px; }
+
+  #mission-panel { position: absolute; top: 14px; left: 252px; max-width: 340px; padding: 10px 14px;
+                   opacity: 0; transition: opacity 0.3s; }
+  #mission-panel.show { opacity: 1; }
+  #mission-title { color: #ffd23e; font-weight: 700; font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase; }
+  #mission-objective { font-size: 15px; margin-top: 3px; line-height: 1.3; }
+  #mission-dist { color: #9fd8e8; font-size: 12px; margin-top: 2px; }
+
+  #police-panel { position: absolute; top: 14px; right: 14px; width: 252px; padding: 9px 12px;
+                  opacity: 0; transition: opacity 0.3s; }
+  #police-panel.show { opacity: 1; }
+  #stars { font-size: 21px; color: #5a6672; letter-spacing: 3px; text-align: right; }
+  #stars.hot { color: #ffd23e; text-shadow: 0 0 9px rgba(255, 180, 40, 0.8); }
+  .police-row { display: flex; justify-content: space-between; font-size: 12px; padding: 2.5px 0;
+                border-top: 1px solid rgba(255,255,255,0.08); }
+  .police-call { color: #7db8ff; font-weight: 700; }
+  .police-role { color: #c8d2dc; }
+  .police-dist { color: #8fa0ae; }
+
+  #crew-panel { position: absolute; left: 14px; bottom: 118px; width: 218px; padding: 8px 10px; }
+  .panel-head { font-size: 10px; letter-spacing: 3px; color: #ffd23e; margin-bottom: 4px; }
+  .crew-row { display: flex; align-items: center; gap: 7px; font-size: 12px; padding: 3px 0; opacity: 0.55; }
+  .crew-row.ready { opacity: 1; }
+  .crew-row.active { opacity: 1; color: #8ef0b3; }
+  .crew-key { background: #ffd23e; color: #14181d; font-weight: 800; border-radius: 4px; padding: 0 5px; font-size: 11px; }
+  .crew-name { flex: 1; white-space: nowrap; overflow: hidden; }
+  .crew-cd { color: #9fd8e8; font-size: 11px; font-weight: 700; }
+
+  #vitals { position: absolute; left: 14px; bottom: 74px; width: 218px; padding: 8px 10px; }
+  #health-bar { height: 9px; background: rgba(255,255,255,0.15); border-radius: 5px; overflow: hidden; }
+  #health-fill { height: 100%; width: 100%; background: linear-gradient(90deg, #37d67a, #a8e063); transition: width 0.2s; }
+  #speedo { font-size: 12px; color: #9fd8e8; margin-top: 4px; min-height: 14px; font-weight: 700; }
+
+  #weapon-panel { position: absolute; right: 14px; bottom: 74px; padding: 7px 9px; }
+  .weapon-slot { display: flex; gap: 7px; align-items: center; font-size: 12.5px; padding: 3px 6px;
+                 border-radius: 6px; opacity: 0.5; }
+  .weapon-slot.current { opacity: 1; background: rgba(255, 210, 62, 0.18); }
+  .weapon-slot.locked { opacity: 0.28; text-decoration: line-through; }
+  .weapon-key { background: rgba(255,255,255,0.85); color: #14181d; font-weight: 800; border-radius: 4px; padding: 0 5px; font-size: 11px; }
+
+  #rank-panel { position: absolute; right: 14px; bottom: 14px; width: 252px; padding: 9px 12px; text-align: right; }
+  #cash { color: #8ef0b3; font-weight: 800; font-size: 19px; }
+  #rank-name { font-size: 12px; color: #ffd23e; letter-spacing: 1px; margin-top: 1px; }
+  #rp-bar { height: 6px; background: rgba(255,255,255,0.15); border-radius: 4px; margin-top: 5px; overflow: hidden; }
+  #rp-fill { height: 100%; width: 0%; background: #ffd23e; }
+
+  #busted-wrap { position: absolute; left: 50%; bottom: 190px; transform: translateX(-50%); width: 300px;
+                 text-align: center; opacity: 0; transition: opacity 0.2s; }
+  #busted-wrap.show { opacity: 1; }
+  #busted-label { color: #ff5f4d; font-weight: 800; letter-spacing: 4px; font-size: 13px; }
+  #busted-bar { height: 8px; background: rgba(255,255,255,0.18); border-radius: 4px; overflow: hidden; margin-top: 3px; }
+  #busted-fill { height: 100%; width: 0%; background: #ff5f4d; }
+
+  #dialogue { position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%); width: min(620px, 80vw);
+              padding: 10px 16px; opacity: 0; transition: opacity 0.3s; }
+  #dialogue.show { opacity: 1; }
+  #dialogue-name { color: #ffd23e; font-weight: 700; font-size: 12.5px; letter-spacing: 1px; }
+  #dialogue-text { font-size: 15.5px; line-height: 1.35; margin-top: 2px; }
+
+  #prompt { position: absolute; left: 50%; bottom: 52px; transform: translateX(-50%);
+            font-size: 14.5px; font-weight: 600; color: #fff; text-shadow: 0 1px 6px #000;
+            opacity: 0; transition: opacity 0.2s; white-space: nowrap; }
+  #prompt.show { opacity: 1; }
+
+  #toast { position: absolute; top: 84px; left: 50%; transform: translateX(-50%);
+           background: rgba(10, 15, 22, 0.78); border: 1px solid rgba(255, 210, 62, 0.5);
+           color: #ffe9a3; padding: 8px 18px; border-radius: 20px; font-size: 14.5px; font-weight: 600;
+           opacity: 0; transition: opacity 0.3s; white-space: nowrap; }
+  #toast.show { opacity: 1; }
+
+  #crosshair { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px;
+               transform: translate(-50%, -50%); border: 2px solid rgba(255,255,255,0.85); border-radius: 50%;
+               box-shadow: 0 0 0 1.5px rgba(0,0,0,0.45) inset; opacity: 0; }
+  #crosshair.show { opacity: 1; }
+  #crosshair::after { content: ""; position: absolute; left: 50%; top: 50%; width: 3px; height: 3px;
+                      background: #ffd23e; border-radius: 50%; transform: translate(-50%, -50%); }
+
+  #hurt-vignette { position: fixed; inset: 0; pointer-events: none; opacity: 0; z-index: 6;
+                   background: radial-gradient(ellipse at center, transparent 52%, rgba(200, 20, 20, 0.5) 100%); }
+
+  /* ---------- title screen ---------- */
+  #title-screen { position: fixed; inset: 0; z-index: 10; display: none;
+                  background: linear-gradient(180deg, rgba(8, 10, 24, 0.52) 0%, rgba(8, 10, 24, 0.05) 42%, rgba(8, 10, 24, 0.66) 100%); }
+  #title-screen.show { display: block; }
+  .title-inner { height: 100%; display: flex; flex-direction: column; align-items: center; padding: 34px 20px 22px; }
+  .title-logo { font-size: 74px; font-weight: 900; letter-spacing: 2px; color: #fff;
+                text-shadow: 0 4px 0 #0d7d7d, 0 10px 34px rgba(0,0,0,0.65); }
+  .title-logo span { color: #ffb02e; text-shadow: 0 4px 0 #a33d12, 0 10px 34px rgba(0,0,0,0.65); }
+  .title-tag { margin-top: 2px; font-size: 13.5px; letter-spacing: 4.5px; color: #ffe9a3; text-shadow: 0 1px 8px #000; }
+  .title-menu { display: flex; gap: 14px; margin-top: auto; }
+  .title-menu button, .slot-actions button, .dossier-head button {
+    pointer-events: auto; cursor: pointer; border: 1px solid rgba(255, 210, 62, 0.65);
+    background: rgba(12, 18, 26, 0.82); color: #ffd23e; font: 700 15px "Avenir Next", "Segoe UI", system-ui, sans-serif;
+    padding: 10px 26px; border-radius: 8px; letter-spacing: 1px; }
+  .title-menu button:hover, .slot-actions button:hover, .dossier-head button:hover { background: rgba(255, 210, 62, 0.92); color: #14181d; }
+  #title-slots { display: flex; gap: 12px; margin-top: 16px; }
+  .slot-card { width: 252px; background: rgba(10, 15, 22, 0.78); border: 1px solid rgba(255,255,255,0.22);
+               border-radius: 10px; padding: 7px 11px; pointer-events: auto; }
+  #title-slots .slot-card { cursor: pointer; }
+  .slot-card.empty { opacity: 0.6; }
+  .slot-head { color: #ffd23e; font-size: 11.5px; font-weight: 800; letter-spacing: 1.2px; }
+  .slot-body { font-size: 13px; margin-top: 3px; line-height: 1.35; }
+  .slot-when { font-size: 11px; color: #8fa0ae; margin-top: 2px; }
+  .slot-actions { display: flex; gap: 8px; margin-top: 5px; }
+  .slot-actions button { padding: 4px 13px; font-size: 12.5px; }
+  .slot-actions button[disabled] { opacity: 0.35; cursor: default; }
+  .title-controls { margin-top: 14px; font-size: 12.5px; color: rgba(255,255,255,0.85); letter-spacing: 0.6px; text-shadow: 0 1px 5px #000; }
+
+  /* ---------- dossier ---------- */
+  #dossier { position: fixed; inset: 0; z-index: 9; display: none; background: rgba(6, 10, 15, 0.94); overflow: auto; }
+  #dossier.show { display: block; }
+  .dossier-inner { max-width: 1060px; margin: 0 auto; padding: 13px 24px 16px; }
+  .dossier-head { display: flex; align-items: center; gap: 10px; font-size: 19px; font-weight: 900; letter-spacing: 2.5px; color: #ffd23e; }
+  .dossier-head button { margin-left: auto; padding: 5px 14px; font-size: 12.5px; }
+  .dossier-head button + button { margin-left: 0; }
+  .dossier-cols { display: flex; gap: 22px; margin-top: 11px; align-items: flex-start; }
+  .dossier-left { flex: 0 0 420px; }
+  #dossier-map { width: 420px; height: 420px; border-radius: 10px; border: 1px solid rgba(255, 210, 62, 0.4); }
+  .ring-wrap { display: flex; align-items: center; gap: 14px; margin-top: 10px; }
+  .ring-label { font-size: 12px; letter-spacing: 3px; color: #ffd23e; font-weight: 700; }
+  .dossier-right { flex: 1; min-width: 0; }
+  .dossier-right h3 { font-size: 11.5px; letter-spacing: 3px; color: #ffd23e; margin: 8px 0 4px; }
+  .dossier-right h3:first-child { margin-top: 0; }
+  .check-row { display: flex; align-items: center; gap: 10px; font-size: 13px; padding: 1.3px 0; }
+  .check-label { flex: 0 0 168px; }
+  .check-bar { flex: 1; height: 7px; background: rgba(255,255,255,0.14); border-radius: 4px; overflow: hidden; }
+  .check-fill { display: block; height: 100%; background: #ffd23e; }
+  .check-count { color: #9fd8e8; font-weight: 700; font-size: 12.5px; }
+  .career-row { display: flex; justify-content: space-between; font-size: 13px; padding: 1.3px 0;
+                border-bottom: 1px solid rgba(255,255,255,0.07); }
+  .medal-row { display: flex; align-items: center; gap: 9px; font-size: 13px; padding: 1.3px 0; }
+  .medal-dot { width: 13px; height: 13px; border-radius: 50%; background: #3a424c; flex: 0 0 13px; }
+  .medal-dot.gold { background: #ffd23e; box-shadow: 0 0 7px rgba(255, 210, 62, 0.8); }
+  .medal-dot.silver { background: #cfd8e3; }
+  .medal-dot.bronze { background: #c47b42; }
+  .medal-name { flex: 1; }
+  .medal-label { color: #9fd8e8; font-size: 12px; font-weight: 700; }
+  #dossier-slots { display: flex; gap: 10px; }
+  #dossier-slots .slot-card { flex: 1; width: auto; }
+
+  /* ---------- wasted / busted ---------- */
+  #wasted { position: fixed; inset: 0; z-index: 11; display: none; align-items: center; justify-content: center;
+            font-size: 84px; font-weight: 900; letter-spacing: 14px; color: #ff5f4d;
+            background: rgba(10, 4, 4, 0.55); text-shadow: 0 6px 40px rgba(0,0,0,0.8); }
+  #wasted.show { display: flex; }
+</style>
+</head>
+<body>
+<div id="game-root"></div>
+
+<div id="hud">
+  <div id="map-wrap" class="panel"><canvas id="minimap" width="218" height="218"></canvas><div id="map-label">SOLMAR BAY</div></div>
+  <div id="mission-panel" class="panel">
+    <div id="mission-title"></div>
+    <div id="mission-objective"></div>
+    <div id="mission-dist"></div>
+  </div>
+  <div id="police-panel" class="panel">
+    <div id="stars">☆☆☆☆☆</div>
+    <div id="police-rows"></div>
+  </div>
+  <div id="crew-panel" class="panel"><div class="panel-head">CREW</div><div id="crew-rows"></div></div>
+  <div id="vitals" class="panel"><div id="health-bar"><div id="health-fill"></div></div><div id="speedo"></div></div>
+  <div id="weapon-panel" class="panel"><div id="weapon-slots"></div></div>
+  <div id="rank-panel" class="panel">
+    <div id="cash">$120</div>
+    <div id="rank-name">Errand Runner</div>
+    <div id="rp-bar"><div id="rp-fill"></div></div>
+  </div>
+  <div id="busted-wrap"><div id="busted-label">BUSTED</div><div id="busted-bar"><div id="busted-fill"></div></div></div>
+  <div id="dialogue" class="panel"><div id="dialogue-name"></div><div id="dialogue-text"></div></div>
+  <div id="prompt"></div>
+  <div id="toast"></div>
+  <div id="crosshair"></div>
+</div>
+<div id="hurt-vignette"></div>
+
+<div id="title-screen">
+  <div class="title-inner">
+    <div class="title-logo">SOLMAR <span>HEAT</span></div>
+    <div class="title-tag">AN ORIGINAL ISLAND · AN ORIGINAL CREW · NO BORROWED STREETS</div>
+    <div class="title-menu">
+      <button id="btn-continue">CONTINUE</button>
+      <button id="btn-new">NEW GAME</button>
+    </div>
+    <div id="title-slots"></div>
+    <div class="title-controls">WASD — drive &amp; walk · E — enter car · Mouse — aim · Click — fire · 1/2/3 — weapons · Q / R / C — crew · T — radio · Tab — dossier</div>
+  </div>
+</div>
+
+<div id="dossier">
+  <div class="dossier-inner">
+    <div class="dossier-head">REN KADIR — DOSSIER
+      <button id="btn-resume">RESUME</button>
+      <button id="btn-quit-title">TITLE</button>
+    </div>
+    <div class="dossier-cols">
+      <div class="dossier-left">
+        <canvas id="dossier-map" width="420" height="420"></canvas>
+        <div class="ring-wrap"><canvas id="ring-canvas" width="118" height="118"></canvas><div class="ring-label">COMPLETION</div></div>
+      </div>
+      <div class="dossier-right">
+        <h3>CHECKLIST</h3><div id="checklist"></div>
+        <h3>CAREER</h3><div id="career-stats"></div>
+        <h3>STORY RATINGS</h3><div id="medals"></div>
+        <h3>SAVE SLOTS</h3><div id="dossier-slots"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="wasted"></div>
+
+<script src="./vendor/three.min.js"></script>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
